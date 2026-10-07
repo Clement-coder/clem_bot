@@ -54,13 +54,19 @@ async function askAI(userId, userMessage) {
   return aiMessage
 }
 
+async function generateImage(prompt) {
+  const encodedPrompt = encodeURIComponent(prompt)
+  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`
+  return imageUrl
+}
+
 bot.start((ctx) => {
   const firstName = ctx.from.first_name
-  ctx.reply(`Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Patrick Walshak.\n\nJust send me any message and I will respond. Let us get started!`)
+  ctx.reply(`Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Patrick Walshak.\n\nWhat I can do:\n🤖 Answer any question — just type it\n🎨 Generate images — /image a sunset over Lagos\n🗑 Clear history — /clear\n❓ Get help — /help\n\nLet us get started!`)
 })
 
 bot.help((ctx) => {
-  ctx.reply(`Commands:\n\n/start - Start a conversation\n/help - Show this message\n/clear - Clear conversation history\n\nOr just type any message!`)
+  ctx.reply(`Commands:\n\n/start - Start a conversation\n/help - Show this message\n/clear - Clear conversation history\n/image [description] - Generate an AI image\n\nExample:\n/image a futuristic robot in Lagos\n\nOr just type any message for AI chat!`)
 })
 
 bot.command('clear', (ctx) => {
@@ -80,6 +86,29 @@ bot.on('text', async (ctx) => {
   } catch (error) {
     console.error('Error:', error)
     await ctx.reply('Sorry I encountered an error. Please try again.')
+  }
+})
+
+bot.command('image', async (ctx) => {
+  const prompt = ctx.message.text.replace('/image', '').trim()
+
+  if (!prompt) {
+    return ctx.reply('Please provide a description. Example:\n/image a futuristic city in Nigeria at night')
+  }
+
+  try {
+    await ctx.sendChatAction('upload_photo')
+    ctx.reply('Generating your image... Please wait a moment.')
+
+    const imageUrl = await generateImage(prompt)
+
+    await ctx.replyWithPhoto(imageUrl, {
+      caption: `🎨 Generated: ${prompt}`
+    })
+
+  } catch (error) {
+    console.error('Image error:', error)
+    ctx.reply('Sorry I could not generate that image. Please try again.')
   }
 })
 
