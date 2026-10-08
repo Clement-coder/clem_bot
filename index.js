@@ -115,27 +115,23 @@ bot.command('image', async (ctx) => {
     )
   }
 
-  try {
+ try {
     await ctx.sendChatAction('upload_photo')
-    await ctx.reply('⏳ Generating your image... Please wait about 10 seconds.')
+    await ctx.reply('⏳ Generating your image... Please wait about 15 seconds.')
 
     const encodedPrompt = encodeURIComponent(prompt)
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`
 
-    console.log('Downloading image from:', imageUrl)
+    console.log('Image URL:', imageUrl)
 
-    const imageBuffer = await downloadImage(imageUrl)
-
-    console.log('Image downloaded. Size:', imageBuffer.length, 'bytes')
-
-    await ctx.replyWithPhoto(
-      { source: imageBuffer },
-      { caption: `🎨 ${prompt}` }
-    )
+    // Let Telegram fetch the image directly from the URL
+    await ctx.replyWithPhoto(imageUrl, {
+      caption: `🎨 ${prompt}`
+    })
 
   } catch (error) {
-    console.error('Image generation error:', error.message)
-    await ctx.reply('Sorry I could not generate that image. Please try again with a different description.')
+    console.error('Image error:', error.message)
+    await ctx.reply('Sorry I could not generate that image. Please try again.')
   }
 })
 
