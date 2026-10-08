@@ -115,19 +115,31 @@ bot.command('image', async (ctx) => {
 
   try {
     await ctx.sendChatAction('upload_photo')
-    await ctx.reply('⏳ Generating your image... Please wait about 15 seconds.')
+    await ctx.reply('⏳ Generating your image... Please wait about 20 seconds.')
 
-    const encodedPrompt = encodeURIComponent(prompt)
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`
+    console.log('Generating image for prompt:', prompt)
 
-    console.log('Fetching image from:', imageUrl)
-
-    // Use node-fetch to download the image
     const fetch = (await import('node-fetch')).default
-    const response = await fetch(imageUrl, { timeout: 30000 })
+
+    const response = await fetch(
+      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ inputs: prompt }),
+        timeout: 60000
+      }
+    )
+
+    console.log('HuggingFace response status:', response.status)
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`)
+      const errorText = await response.text()
+      console.error('HuggingFace error:', errorText)
+      throw new Error(`Image generation failed: ${response.status}`)
     }
 
     const arrayBuffer = await response.arrayBuffer()
@@ -142,7 +154,7 @@ bot.command('image', async (ctx) => {
 
   } catch (error) {
     console.error('Image error:', error.message)
-    await ctx.reply('Sorry I could not generate that image. Please try again.')
+    await ctx.reply('Sorry I could not generate that image. Please try again in a moment.')
   }
 })
 
