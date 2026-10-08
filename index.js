@@ -1,6 +1,8 @@
 require('dotenv').config()
 const { Telegraf } = require('telegraf')
 const Groq = require('groq-sdk')
+const https = require('https')
+const http = require('http')
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN)
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -18,8 +20,9 @@ Your personality:
 Rules:
 - Keep responses under 200 words
 - Be conversational and helpful
-- If asked who built you say Patrick Walshak built you`
-
+- If asked who built you say Patrick Walshak built you
+- You CAN generate images using the /image command
+- Never say you cannot generate images`
 
 async function askAI(userId, userMessage) {
   if (!conversations[userId]) {
@@ -55,19 +58,46 @@ async function askAI(userId, userMessage) {
   return aiMessage
 }
 
-async function generateImage(prompt) {
-  const encodedPrompt = encodeURIComponent(prompt)
-  const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`
-  return imageUrl
+async function downloadImage(url) {
+  return new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https') ? https : http
+
+    const request = protocol.get(url, { timeout: 30000 }, (response) => {
+      if (response.statusCode === 301 || response.statusCode === 302) {
+        downloadImage(response.headers.location).then(resolve).catch(reject)
+        return
+      }
+
+      if (response.statusCode !== 200) {
+        reject(new Error(`Failed to download image. Status: ${response.statusCode}`))
+        return
+      }
+
+      const chunks = []
+      response.on('data', (chunk) => chunks.push(chunk))
+      response.on('end', () => resolve(Buffer.concat(chunks)))
+      response.on('error', reject)
+    })
+
+    request.on('error', reject)
+    request.on('timeout', () => {
+      request.destroy()
+      reject(new Error('Image download timed out'))
+    })
+  })
 }
 
 bot.start((ctx) => {
   const firstName = ctx.from.first_name
-  ctx.reply(`Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Patrick Walshak.\n\nWhat I can do:\n🤖 Answer any question — just type it\n🎨 Generate images — /image a sunset over Lagos\n🗑 Clear history — /clear\n❓ Get help — /help\n\nLet us get started!`)
+  ctx.reply(
+    `Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Patrick Walshak.\n\nWhat I can do:\n🤖 Answer any question — just type it\n🎨 Generate images — /image a sunset over Lagos\n🗑 Clear history — /clear\n❓ Get help — /help\n\nLet us get started!`
+  )
 })
 
 bot.help((ctx) => {
-  ctx.reply(`Commands:\n\n/start - Start a conversation\n/help - Show this message\n/clear - Clear conversation history\n/image [description] - Generate an AI image\n\nExample:\n/image a futuristic robot in Lagos\n\nOr just type any message for AI chat!`)
+  ctx.reply(
+    `Commands:\n\n/start - Start a conversation\n/help - Show this message\n/clear - Clear conversation history\n/image [description] - Generate an AI image\n\nExample:\n/image a futuristic robot in Lagos\n\nOr just type any message for AI chat!`
+  )
 })
 
 bot.command('clear', (ctx) => {
@@ -76,11 +106,43 @@ bot.command('clear', (ctx) => {
   ctx.reply('Conversation cleared. Starting fresh!')
 })
 
+bot.command('image', async (ctx) => {
+  const prompt = ctx.message.text.replace('/image', '').trim()
+
+  if (!prompt) {
+    return ctx.reply(
+      'Please provide a description after the command.\n\nExample:\n/image a futuristic city in Nigeria at night'
+    )
+  }
+
+  try {
+    await ctx.sendChatAction('upload_photo')
+    await ctx.reply('⏳ Generating your image... Please wait about 10 seconds.')
+
+    const encodedPrompt = encodeURIComponent(prompt)
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`
+
+    console.log('Downloading image from:', imageUrl)
+
+    const imageBuffer = await downloadImage(imageUrl)
+
+    console.log('Image downloaded. Size:', imageBuffer.length, 'bytes')
+
+    await ctx.replyWithPhoto(
+      { source: imageBuffer },
+      { caption: `🎨 ${prompt}` }
+    )
+
+  } catch (error) {
+    console.error('Image generation error:', error.message)
+    await ctx.reply('Sorry I could not generate that image. Please try again with a different description.')
+  }
+})
+
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id
   const text = ctx.message.text
 
-  // Skip all commands
   if (text.startsWith('/')) return
 
   try {
@@ -88,31 +150,8 @@ bot.on('text', async (ctx) => {
     const response = await askAI(userId, text)
     await ctx.reply(response)
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Chat error:', error)
     await ctx.reply('Sorry I encountered an error. Please try again.')
-  }
-})
-
-bot.command('image', async (ctx) => {
-  const prompt = ctx.message.text.replace('/image', '').trim()
-
-  if (!prompt) {
-    return ctx.reply('Please provide a description. Example:\n/image a futuristic city in Nigeria at night')
-  }
-
-  try {
-    await ctx.sendChatAction('upload_photo')
-    ctx.reply('Generating your image... Please wait a moment.')
-
-    const imageUrl = await generateImage(prompt)
-
-    await ctx.replyWithPhoto(imageUrl, {
-      caption: `🎨 Generated: ${prompt}`
-    })
-
-  } catch (error) {
-    console.error('Image error:', error)
-    ctx.reply('Sorry I could not generate that image. Please try again.')
   }
 })
 
