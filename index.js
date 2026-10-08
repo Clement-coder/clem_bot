@@ -110,24 +110,35 @@ bot.command('image', async (ctx) => {
   const prompt = ctx.message.text.replace('/image', '').trim()
 
   if (!prompt) {
-    return ctx.reply(
-      'Please provide a description after the command.\n\nExample:\n/image a futuristic city in Nigeria at night'
-    )
+    return ctx.reply('Please provide a description.\n\nExample:\n/image a futuristic city in Nigeria at night')
   }
 
- try {
+  try {
     await ctx.sendChatAction('upload_photo')
     await ctx.reply('⏳ Generating your image... Please wait about 15 seconds.')
 
     const encodedPrompt = encodeURIComponent(prompt)
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`
 
-    console.log('Image URL:', imageUrl)
+    console.log('Fetching image from:', imageUrl)
 
-    // Let Telegram fetch the image directly from the URL
-    await ctx.replyWithPhoto(imageUrl, {
-      caption: `🎨 ${prompt}`
-    })
+    // Use node-fetch to download the image
+    const fetch = (await import('node-fetch')).default
+    const response = await fetch(imageUrl, { timeout: 30000 })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const imageBuffer = Buffer.from(arrayBuffer)
+
+    console.log('Image size:', imageBuffer.length, 'bytes')
+
+    await ctx.replyWithPhoto(
+      { source: imageBuffer },
+      { caption: `🎨 ${prompt}` }
+    )
 
   } catch (error) {
     console.error('Image error:', error.message)
