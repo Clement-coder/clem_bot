@@ -9,7 +9,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const conversations = {}
 
-const SYSTEM_PROMPT = `You are WallexNexus, an intelligent AI assistant built by Patrick Walshak, a Full-Stack Software Engineer and AI Automation Engineer from Nigeria.
+const SYSTEM_PROMPT = `You are WallexNexus, an intelligent AI assistant built by Clement, a Full-Stack Software Engineer and AI Automation Engineer from Nigeria.
 
 Your personality:
 - You are helpful, friendly and slightly futuristic
@@ -20,7 +20,7 @@ Your personality:
 Rules:
 - Keep responses under 200 words
 - Be conversational and helpful
-- If asked who built you say Patrick Walshak built you
+- If asked who built you say Clement built you
 - You CAN generate images using the /image command
 - Never say you cannot generate images`
 
@@ -39,7 +39,7 @@ async function askAI(userId, userMessage) {
   }
 
   const response = await groq.chat.completions.create({
-    model: 'qwen/qwen3.8-27b',
+    model: 'llama3-8b-8192',
     temperature: 0.7,
     max_tokens: 300,
     messages: [
@@ -90,7 +90,7 @@ async function downloadImage(url) {
 bot.start((ctx) => {
   const firstName = ctx.from.first_name
   ctx.reply(
-    `Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Patrick Walshak.\n\nWhat I can do:\n🤖 Answer any question — just type it\n🎨 Generate images — /image a sunset over Lagos\n🗑 Clear history — /clear\n❓ Get help — /help\n\nLet us get started!`
+    `Hello ${firstName}! 👋\n\nI am WallexNexus, your AI assistant built by Clement.\n\nWhat I can do:\n🤖 Answer any question — just type it\n🎨 Generate images — /image a sunset over Lagos\n🗑 Clear history — /clear\n❓ Get help — /help\n\nLet us get started!`
   )
 })
 
@@ -174,8 +174,17 @@ bot.on('text', async (ctx) => {
   }
 })
 
-bot.launch()
-console.log('WallexNexus Bot is running...')
+async function startBot() {
+  try {
+    await bot.launch()
+    console.log('WallexNexus Bot is running...')
+  } catch (error) {
+    console.error('Failed to start, retrying in 5 seconds...', error.message)
+    setTimeout(startBot, 5000)
+  }
+}
+
+startBot()
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
